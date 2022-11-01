@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+</head>
+
+<body>
+    <div id="board">
+    </div>
+
+    <script>
+        // 1创建XMLHttpRequest
+        let xhr = new XMLHttpRequest()
+
+        // 2利用open方法引用目标地址
+        xhr.open('GET', './step2.json?' + new Date().valueOf())
+
+        // 3利用send发起AJax请求
+        xhr.send()
+
+        // 4利用onreadystatechange函数来进行监听
+        xhr.onreadystatechange = function () {
+            // 5监听xhr的请求状态 readyState为4代表请求成功，status为200代表响应成功
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                // 打印数据
+                console.log(xhr.responseText)
+                // json 转 对象
+                let resultObj = JSON.parse(xhr.responseText)
+                console.log(resultObj)
+            }
+        }
+    </script>
+</body>
+
+</html>

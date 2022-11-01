@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+</head>
+
+<body>
+
+    <div id="board"></div>
+    <script>
+        //使用proxy创建代理对象
+        function observer(target) {
+            const div = document.getElementById("board");
+            const proxy = new Proxy(target, {
+                set(target, prop, value) {
+                    // 设置对象属性
+                    console.log('setter ', prop, target[prop], value)
+                    return Reflect.set(target, prop, value);
+                },
+                get(target, prop){
+                    // 获取对象属性
+                    console.log('getter ', prop)
+                    return Reflect.get(target, prop);
+                }
+            })
+            return proxy;
+        }
+
+        // 创建对象
+        const data = {
+            a: 1,
+            b: 2
+        }
+        // 监听对象变化
+        const obj = observer(data)
+        const arr = observer([])
+    </script>
+</body>
+
+</html>

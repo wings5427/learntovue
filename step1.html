@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+</head>
+
+<body>
+    <div id="board">
+
+    </div>
+    <!-- 动态创建dom节点 -->
+    <script type="text/javascript">
+        // <div id="board"> 
+        var board = document.getElementById("board");
+            
+            
+        //     <select>
+        //         <option value="1">项目1</option>
+        //         <option value="2">项目2</option>
+        //     </select>
+        var dropdownList = document.createElement("select");
+        dropdownList.options[0] = new Option("项目1", "1");
+        dropdownList.options[1] = new Option("项目2", "2");
+        board.appendChild(dropdownList);
+
+        //     <span>项目数量：</span>
+        var label = document.createElement("span")
+        label.innerText = "项目数量："
+        board.appendChild(label);
+
+        //     <input id="itemCount" name="itemCount" type="text" value="2" size="2" disabled/>
+        var itemCount = document.createElement("input");
+        itemCount.setAttribute("id", "itemCount")
+        itemCount.setAttribute("name", "itemCount");
+        itemCount.setAttribute("type", "text");
+        itemCount.setAttribute("value", "2");
+        itemCount.setAttribute("size", "2");
+        itemCount.setAttribute("disabled", true);
+        board.appendChild(itemCount)
+
+        //     <span>按钮点击次数</span>
+        var label = document.createElement("span")
+        label.innerText = "按钮点击次数："
+        board.appendChild(label);
+
+        //     <input id="buttonClickCount" name="buttonClickCount" type="text" value="2" size="2" disabled/>
+        var buttonClickCount = document.createElement("input");
+        buttonClickCount.setAttribute("id", "buttonClickCount")
+        buttonClickCount.setAttribute("name", "buttonClickCount");
+        buttonClickCount.setAttribute("type", "text");
+        buttonClickCount.setAttribute("value", "2");
+        buttonClickCount.setAttribute("size", "2");
+        buttonClickCount.setAttribute("disabled", true);
+        board.appendChild(buttonClickCount)
+        
+        //     <div>
+        var subDiv = document.createElement("div")
+        board.appendChild(subDiv)
+        
+        //         <input type="button" value="加载后台数据" onclick="javascript:alert('This is a test!');">
+        var addButtonCount = document.createElement("input");
+        addButtonCount.type = "button";
+        addButtonCount.value = "加载后台数据";
+        addButtonCount.setAttribute("onclick", "javascript:alert('This is a test!');");
+        subDiv.appendChild(addButtonCount);
+
+        //         <input id="optionText" name="optionText" type="text" value="test"/>
+        var optionText = document.createElement("input");
+        optionText.setAttribute("id", "itemCount")
+        optionText.setAttribute("name", "itemCount");
+        optionText.setAttribute("type", "text");
+        optionText.setAttribute("value", "test");
+        subDiv.appendChild(optionText)
+
+        //         <input type="button" value="添加到选项列表" onclick="javascript:alert('This is a test!');">
+        var addButton = document.createElement("input");
+        addButton.setAttribute("type", "button");
+        addButton.setAttribute("value", "添加到选项列表");
+        addButton.setAttribute("onclick", "javascript:alert('This is a test!');");
+        subDiv.appendChild(addButton)
+
+    </script>
+</body>
+
+</html>

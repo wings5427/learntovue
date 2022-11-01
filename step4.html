@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+</head>
+
+<body onload="init()">
+    <div id="board">
+        <select id="dropdownList">
+        </select>
+        <span>项目数量：</span>
+        <input id="itemCount" name="itemCount" type="text" size="2" disabled />
+        <span>按钮点击次数</span>
+        <input id="buttonClickCount" name="buttonClickCount" type="text" size="2" disabled />
+        <div>
+            <input type="button" value="加载后台数据" onclick="loadButtonClick()">
+            <input id="optionText" name="optionText" type="text" value="test" />
+            <input type="button" value="添加到选项列表" onclick="addButtonClick()">
+        </div>
+    </div>
+
+    <script>
+        var options = [] //保存下拉选项数据的模型
+        var textBoxData = '' // 文本框的模型
+        var buttonClickCount = 0 //按钮点击次数的模型
+
+        // 用于描绘视图的方法
+        function render() {
+             // 按钮点击次数
+             document.getElementById('buttonClickCount').value = buttonClickCount
+
+            // 清空下拉列表的选项
+            let dropdownList = document.getElementById('dropdownList')
+            while (dropdownList.options.length > 0) {
+                dropdownList.removeChild(dropdownList.options[0])
+            }
+            // 将保存下拉选项数据的模型中的数据填充下拉列表选项
+            for (let i = 0; i < options.length; i++) {
+                dropdownList.options[i] = new Option(options[i].label, options[i].value)
+            }
+
+            // 更新项目数量
+            document.getElementById('itemCount').value = options.length
+
+            // 设置文本框的值
+            let optionText = document.getElementById('optionText')
+            optionText.value = textBoxData
+        }
+
+        // 初始化
+        function init() {
+            // 初始化数据模型
+            options = [
+                {
+                    "label": "项目1",
+                    "value": "项目1"
+                },
+                {
+                    "label": "项目2",
+                    "value": "项目2"
+                }
+            ]
+            textBoxData = 'test'
+            buttonClickCount = 0
+
+            // 刷新视图
+            render()
+        }
+
+       // 加载后台数据的点击事件处理函数
+       function loadButtonClick() {
+            // 更新按钮点击次数
+            buttonClickCount++
+
+            // 发出异步请求获取后台数据
+            let xhr = new XMLHttpRequest()
+            xhr.open('GET', './step2.json?' + new Date().valueOf())
+            xhr.send()
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    // 使用后台数据填充下拉列表选项
+                    options = JSON.parse(xhr.responseText)
+                    // 刷新视图
+                    render()
+                }
+            }
+        }
+
+        // 添加到选项列表按钮的点击事件处理函数
+        function addButtonClick() {
+            // 更新按钮点击次数
+            buttonClickCount++
+
+            //获取文本框
+            let textBox = document.getElementById('optionText')
+            // 向下拉列表中增加一个选项
+            options.push(
+                {
+                    "label": textBox.value,
+                    "value": textBox.value
+                }
+            )
+
+            // 清空文本框内容
+            textBoxData = '' 
+
+            // 刷新视图
+            render()
+        }
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+</head>
+
+<body onload="init()">
+    <div id="board">
+        <select id="dropdownList">
+        </select>
+        <span>项目数量：</span>
+        <input id="itemCount" name="itemCount" type="text" size="2" disabled />
+        <span>按钮点击次数</span>
+        <input id="buttonClickCount" name="buttonClickCount" type="text" size="2" disabled />
+        <div>
+            <input type="button" value="加载后台数据" onclick="loadButtonClick()">
+            <input id="optionText" name="optionText" type="text" value="test" />
+            <input type="button" value="添加到选项列表" onclick="addButtonClick()">
+        </div>
+    </div>
+    <script>
+        // 保存按钮点击次数
+        var buttonClickCount = 0
+
+        // 初始化
+        function init() {
+            // 下拉列表初始选项
+            let options = [
+                {
+                    "label": "项目1",
+                    "value": "项目1"
+                },
+                {
+                    "label": "项目2",
+                    "value": "项目2"
+                }
+            ]
+            let dropdownList = document.getElementById('dropdownList')
+            for (let i = 0; i < options.length; i++) {
+                dropdownList.options[i] = new Option(options[i].label, options[i].value)
+            }
+            // 更新项目数量
+            document.getElementById('itemCount').value = options.length
+
+
+             // 按钮点击次数
+             buttonClickCount = 0
+             document.getElementById('buttonClickCount').value = buttonClickCount
+        }
+
+        // 加载后台数据的点击事件处理函数
+        function loadButtonClick() {
+            // 更新按钮点击次数
+            buttonClickCount++
+            document.getElementById('buttonClickCount').value = buttonClickCount
+
+            // 清空下拉列表的选项
+            let dropdownList = document.getElementById('dropdownList')
+            while (dropdownList.options.length > 0) {
+                dropdownList.removeChild(dropdownList.options[0])
+            }
+
+            // 发出异步请求获取后台数据
+            let xhr = new XMLHttpRequest()
+            xhr.open('GET', './step2.json?' + new Date().valueOf())
+            xhr.send()
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    // 使用后台数据填充下拉列表选项
+                    let optionArray = JSON.parse(xhr.responseText)
+                    for (let i = 0; i < optionArray.length; i++) {
+                        dropdownList.options[i] = new Option(optionArray[i].label, optionArray[i].value)
+                    }
+
+                    // 更新项目数量
+                    document.getElementById('itemCount').value = optionArray.length
+                }
+            }
+        }
+
+        // 添加到选项列表按钮的点击事件处理函数
+        function addButtonClick() {
+            // 更新按钮点击次数
+            buttonClickCount++
+            document.getElementById('buttonClickCount').value = buttonClickCount
+
+            // 向下拉列表中增加一个选项
+            let dropdownList = document.getElementById('dropdownList')
+            let textBox = document.getElementById('optionText')
+            let index = dropdownList.options.length // 获取当前下拉列表的选项个数
+            dropdownList.options[index] = new Option(textBox.value, textBox.value) //将文本框中的文字做为选项插入到下拉列表的选项最后面
+            textBox.value = '' // 清空文本框内容
+
+            // 更新项目数量
+            document.getElementById('itemCount').value = index + 1
+        }
+    </script>
+</body>
+
+</html>
