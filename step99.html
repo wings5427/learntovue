@@ -1,0 +1,12 @@
+<select id="dropdownList">
+    <option value="{{options[index].value}}" v-for="options">{{options[index].label}}</option>
+</select>
+<span>项目数量：</span>
+<input id="itemCount" name="itemCount" type="text" size="2" disabled value="{{options.length}}" />
+<span>按钮点击次数</span>
+<input id="buttonClickCount" name="buttonClickCount" type="text" size="2" disabled value="{{buttonClkCount}}" />
+<div>
+    <input type=" button" value="加载后台数据" @click="loadButtonClick">
+    <input id="optionText" name="optionText" type="text" value="{{textBoxData}}" />
+    <input type="button" value="添加到选项列表" @click="addButtonClick">
+</div>

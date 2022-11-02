@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+    <script src="step99.js"></script>
+</head>
+
+<body onload="init('board', './step99.html')">
+    <div id="board">
+
+    </div>
+
+    <script>
+        // 数据模型
+        var data = {
+            'options': [], //保存下拉选项数据的模型
+            'textBoxData': '', // 文本框的模型
+            'buttonClkCount': 0 // 按钮点击次数
+        }
+
+        var scripts = {
+            // 预留的回调方法
+            'beforeLoad': function () {
+                data.options = [
+                    {
+                        "label": "项目1",
+                        "value": "项目1"
+                    },
+                    {
+                        "label": "项目2",
+                        "value": "项目2"
+                    }
+                ]
+            },
+
+            // 使用后台数据填充下拉列表选项
+            'loadButtonClick': function () {
+                data.buttonClkCount++
+                let xhr = new XMLHttpRequest()
+                xhr.open('GET', './step2.json?' + new Date().valueOf())
+                xhr.send()
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        data.options = JSON.parse(xhr.responseText)
+                        // render()  不再直接调用视图更新方法
+                    }
+                }
+            },
+
+            // 向下拉列表中增加一个选项
+            'addButtonClick': function () {
+                data.buttonClkCount++
+                data.options = [...data.options,
+                {
+                    label: data.textBoxData,
+                    value: data.textBoxData
+                }
+                ]
+                data.textBoxData = ''
+                // render() 不再直接调用视图更新方法
+            }
+        }
+
+    </script>
+</body>
+
+</html>

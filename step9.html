@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- 处理针对数组对象的代理 和 对象递归代理-->
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+</head>
+
+<body onload="init('board')">
+    <div id="board">
+
+    </div>
+
+    <script>
+        // html模板,主要演示对{{textBoxData.value}}的替换
+        var htmlTemplate = `
+            <select id="dropdownList">
+                <option value="{{item.value}}" v-for="item in options">{{item.label}}</option>
+            </select>
+            <span>项目数量：</span>
+            <input id="itemCount" name="itemCount" type="text" size="2" disabled />
+            <span>按钮点击次数</span>
+            <input id="buttonClickCount" name="buttonClickCount" type="text" size="2" disabled />
+            <div>
+                <input type="button" value="加载后台数据" @click="loadButtonClick">
+                <input id="optionText" name="optionText" type="text" value="{{textBoxData}}" />
+                <input type="button" value="添加到选项列表" @click="addButtonClick">
+            </div>
+        `
+
+        // 数据模型
+        var data = {
+            options: [], //保存下拉选项数据的模型
+            textBoxData: '', // 文本框的模型
+            buttonClkCount: 0, // 按钮点击次数
+            test: {
+                'a': []
+            }
+        }
+
+        var scripts = {
+            // 预留的回调方法
+            beforeLoad: function () {
+                data.options = [
+                    {
+                        label: "项目1",
+                        value: "项目1"
+                    },
+                    {
+                        label: "项目2",
+                        value: "项目2"
+                    }
+                ]
+            },
+
+            // 使用后台数据填充下拉列表选项
+            loadButtonClick: function () {
+                data.buttonClkCount++
+                let xhr = new XMLHttpRequest()
+                xhr.open('GET', './step2.json?' + new Date().valueOf())
+                xhr.send()
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        data.options = JSON.parse(xhr.responseText)
+                        // render()  不再直接调用视图更新方法
+                    }
+                }
+            },
+
+            // 向下拉列表中增加一个选项
+            addButtonClick: function (label) {
+                data.buttonClkCount++
+                data.options = [...data.options,
+                    {
+                        label: data.textBoxData,
+                        value: data.textBoxData
+                    }
+                ]
+                data.textBoxData = ''
+                // render() 不再直接调用视图更新方法
+            }
+        }
+
+        // 虚拟Dom
+        var vDom
+        // 用于保存mode和view的映射关系
+        var bindingPropMap = new Map()
+
+        // 初始化
+        function init(rootElementId) {
+            // 执行组件加载前的回调方法
+            scripts.beforeLoad()
+            //使用proxy创建代理（深度代理）
+            this.data = deepProxy(data, data)
+            // 解析html模板得到虚拟Dom
+            this.vDom = parseHtmlTemplateMock(this.htmlTemplate)
+            // 获取Dom根节点并设置事件委托
+            let rootElement = document.getElementById(rootElementId)
+            rootElement.onclick = onEvent
+            // 根据虚拟Dom生成Dom节点
+            makeDomTree(rootElement, vDom)
+        }
+
+        // 执行深度代理
+        function deepProxy(target, parentPropKey, isRoot = true) {
+            for (let propKey in target) {
+                console.log('properties', propKey)
+                target.parentPropKey = parentPropKey
+                if (Array.isArray(target[propKey])) {
+                    // 是数组类型，直接创建代理（这里暂时忽略了数组中包含有对象类型数据也需要进行代理的情况）
+                    target[propKey] = observer(target[propKey])
+                } else if (target[propKey] instanceof Object) {
+                    // 是对象类型，再次遍历对象属性进行代理
+                    target[propKey] = deepProxy(target[propKey], propKey, false)
+                }
+            }
+            return observer(target)
+        }
+
+        function observer(target) {
+            const proxy = new Proxy(target, {
+                set(target, prop, value, receive) {
+                    // 设置对象属性
+                    let result = true
+                    console.log('setter>>>', prop, target[prop], value, receive, target.parentPropKey)
+                    if (Array.isArray(target)) {
+                        // 数组的Push等方法被调用了
+                        result = Reflect.set(target, prop, value)
+                    } else {
+                        // 其它类型的属性
+                        if (target[prop] == value) {
+                            // 属性值没有发生变化，不用更新Dom节点
+                            return true
+                        } else {
+                            result = Reflect.set(target, prop, value)
+                        }
+                    }
+                    if (result == true) {
+                        // 数据更新成功后，根据虚拟Dom更新Dom节点
+                        updateDomTree(prop)
+                    }
+                    console.log('setter<<<', prop, target[prop], value)
+                    return result
+                },
+                get(target, prop) {
+                    // 获取对象属性
+                    // console.log('getter ', prop)
+                    return Reflect.get(target, prop)
+                },
+                // 代理的目标,上下文,参数
+                apply(target, ctx, args) {
+                    console.log('apply', target, ctx, args)
+                    return target(...args)
+                }
+            })
+            return proxy;
+        }
+
+        // 事件委托（适合事件委托的事件有： click ， mousedown ， mouseup ， keydown ， keyup ， keypress）
+        var onEvent = function (event) {
+            // console.log(event.target)
+            console.log('事件代理:', event.type, ' src:', event.srcElement)
+            // console.log(event.type)
+            //console.log(event)
+            let vNode = findVNodeById(vDom, event.target.id)
+            if (vNode == undefined || vNode == null || vNode.events == undefined || vNode.events == null) {
+                return
+            }
+
+            // 根据虚拟Dom将视图上的数据同步到模型中
+            syncFromViewToMode(vDom)
+
+            // 根据虚拟Dom调用事件处理程序
+            let process = vNode.events[event.type]
+            if (process != null && process != undefined) {
+                process(event)
+            }
+        }
+
+        // 根据虚拟Dom生成Dom节点
+        function makeDomTree(rootElement, virElement) {
+            for (let propKey in virElement) {
+                let vNode = virElement[propKey];
+                console.log(vNode.originHtml)
+                let index = 0
+                let nodeCount = 1
+                if (vNode.commands != undefined && vNode.commands != null) {
+                    //有绑定的指令，暂时只处理for
+                    nodeCount = vNode.commands.vFor.length;
+                }
+                for (index = 0; index < nodeCount; index++) {
+                    let domNode = document.createElement(vNode.element);
+                    let id = propKey + (nodeCount <= 1 ? "" : "_" + index)
+                    domNode.setAttribute('id', id)
+                    for (let attributeKey in vNode.attributes) {
+                        let attributeCondition = vNode.attributes[attributeKey]
+                        console.log(attributeKey, attributeCondition)
+                        // 将数据模型中的值设置到真实Dom节点的对应属性上
+                        domNode.setAttribute(attributeKey, conditionEval(attributeCondition, data, index))
+                        //绑定数据模型中的属性与虚拟Dom节点的对应关系
+                        bindingModeAndVNode(attributeCondition, vNode)
+                    }
+                    if (vNode.innerText != null && vNode.innerText != undefined) {
+                        domNode.innerText = conditionEval(vNode.innerText, data, index)
+                    }
+                    rootElement.appendChild(domNode)
+                    // 递归子节点
+                    if (vNode.childs != null) {
+                        makeDomTree(domNode, vNode.childs)
+                    }
+                }
+            }
+        }
+
+        // 根据虚拟Dom更新Dom节点
+        // 应该对比新旧数据的差异，更新差异节点对应的虚拟Dom和真实Dom节点，此处简化为全部重新创建
+        function updateDomTree(modelPropName) {
+            let vNodeSet = bindingPropMap.get(parseModelPropName(modelPropName))
+            for (let vNode of vNodeSet) {
+                console.log('更新Dom src:', vNode.originHtml)
+                let index = 0
+                let nodeCount = 1
+                let parentElement = null
+                let domNode = null
+                if (vNode.commands != undefined && vNode.commands != null) {
+                    //有绑定的指令，暂时只处理for
+                    // nodeCount = vNode.commands.vFor.length
+                    nodeCount = conditionEval('{{options.length}}', data, 0) // 暂时hardcoding
+                    //应该对比新旧数据的差异，更新差异节点对应的虚拟Dom和真实Dom节点，此处简化为全部重新创建
+                    let id = vNode.id + "_0"
+                    parentElement = document.getElementById(id).parentNode
+                    let relNodes = parentElement.childNodes
+                    for (let index = relNodes.length - 1; index >= 0; index--) {
+                        relNodes[index].remove()
+                    }
+                }
+                for (index = 0; index < nodeCount; index++) {
+                    let id = vNode.id + (nodeCount <= 1 ? "" : "_" + index)
+                    if (parentElement != null) {
+                        domNode = document.createElement(vNode.element)
+                        domNode.setAttribute('id', id)
+                        parentElement.appendChild(domNode)
+                    } else {
+                        domNode = document.getElementById(id)
+                    }
+
+                    for (let attributeKey in vNode.attributes) {
+                        let attributeCondition = vNode.attributes[attributeKey]
+                        let attributeValue = conditionEval(attributeCondition, data, index)
+                        console.log('更新Dom', '属性名：', attributeKey, '绑定表达式：', attributeCondition, '表达式求值', attributeValue)
+                        // 将数据模型中的值设置到真实Dom节点的对应属性上
+                        if (attributeKey.trim() == 'value') {
+                            // value属性用setAttribute方法不生效
+                            domNode.value = attributeValue
+                        } else {
+                            domNode.setAttribute(attributeKey, attributeValue)
+                        }
+                        //绑定数据模型中的属性与虚拟Dom节点的对应关系
+                        // bindingModeAndVNode(attributeCondition, vNode)
+                    }
+                    if (vNode.innerText != null && vNode.innerText != undefined) {
+                        domNode.innerText = conditionEval(vNode.innerText, data, index)
+                    }
+                    // 递归子节点
+                    if (vNode.childs != null) {
+                        makeDomTree(domNode, vNode.childs)
+                    }
+                }
+            }
+        }
+
+        // 根据虚拟Dom将视图上的数据同步到模型中
+        function syncFromViewToMode(rootVNode) {
+            for (let propKey in rootVNode) {
+                // console.log(propKey)
+                let vNode = rootVNode[propKey]
+                let domNode = document.getElementById(propKey)
+                if (vNode.attributes != undefined && vNode.attributes != undefined) {
+                    for (let attributeKey in vNode.attributes) {
+                        let attributeValueCondition = vNode.attributes[attributeKey].trim()
+                        if (isCondition(attributeValueCondition)) {
+                            // 有数据绑定，进行数据同步
+                            attributeValueCondition = parseModelPropName(attributeValueCondition)
+                            if (Array.isArray(data[attributeValueCondition])) {
+                                // 暂时不处理数组类型的数据同步
+                                continue
+                            }
+                            console.log('视图上的数据同步到模型', vNode.originHtml, 'dom属性：', attributeKey, '模型属性：', attributeValueCondition, '值：(', data[attributeValueCondition], '=>', domNode[attributeKey], ')')
+                            data[attributeValueCondition] = domNode[attributeKey]
+                        }
+                    }
+                }
+                if (vNode.childs != undefined && vNode.childs != null) {
+                    // 递归处理子节点
+                    syncFromViewToMode(vNode.childs)
+                }
+            }
+        }
+
+        // 通过ID查找对应的虚拟Dom节点
+        function findVNodeById(rootNode, id) {
+            for (let subNodeId in rootNode) {
+                let subNode = rootNode[subNodeId]
+                if (subNodeId == id) {
+                    return subNode
+                }
+                if (subNode.childs != null && subNode.childs != undefined) {
+                    // 有子节点，递归查找
+                    let targetNode = findVNodeById(subNode.childs, id)
+                    if (targetNode != null) {
+                        return targetNode
+                    }
+                }
+            }
+            // 没找到
+            return null
+        }
+
+        //绑定数据模型中的属性与虚拟Dom节点的对应关系（需要处理一对多的情况)
+        function bindingModeAndVNode(condition, vNode) {
+            if (isCondition(condition)) {
+                let modePropName = parseModelPropName(condition)
+                // 绑定属性名与虚拟Dom节点的对应关系
+                if (bindingPropMap.has(modePropName)) {
+                    //一对多的情况
+                    bindingPropMap.get(modePropName).add(vNode)
+                } else {
+                    bindingPropMap.set(modePropName, new Set([vNode]))
+                }
+            }
+        }
+
+        // 基本的工具方法
+        // 判断是否是自定义的表达式
+        function isCondition(condition) {
+            return (condition.indexOf('{{') == 0 && condition.indexOf('}}') == condition.length - 2)
+        }
+        // 对自定义的表达式进行求值
+        function conditionEval(condition, data, index) {
+            condition = condition.trim()
+            if (isCondition(condition)) {
+                let attributeValueCondition = condition.slice(2, condition.length - 2)
+                return eval('data.' + attributeValueCondition)
+            } else {
+                return condition
+            }
+        }
+        // 解析出自定义表达式中的属性名
+        function parseModelPropName(condition) {
+            let modePropName = condition
+            if (condition.indexOf('{{') == 0 && condition.indexOf('}}') == condition.length - 2) {
+                // 计算表达式中包含的数据模型中的属性名
+                modePropName = condition.slice(2, condition.length - 2)
+            }
+            let index = modePropName.indexOf('[')
+            if (index >= 0) {
+                modePropName = modePropName.slice(0, index)
+            }
+            index = modePropName.indexOf('.')
+            if (index >= 0) {
+                modePropName = modePropName.slice(0, index)
+            }
+            return modePropName
+        }
+
+        // html模板解析（模拟方法，没有真正的解析。主要演示虚拟Dom的结构）
+        //     <select id="dropdownList">
+        //        <option value="{{item.value}}" v-for="item in options">{{item.label}}</option>    
+        //     </select>
+        //     <span>项目数量：</span>
+        //     <input id="itemCount" name="itemCount" type="text" size="2" disabled value="{{options.length}}"/>
+        //     <span>按钮点击次数</span>
+        //     <input id="buttonClickCount" name="buttonClickCount" type="text" size="2" disabled value="{{buttonClkCount}}/>
+        //     <div>
+        //         <input type="button" value="加载后台数据" onclick="loadButtonClick()">
+        //         <input id="optionText" name="optionText" type="text" value="{{textBoxData}}" />
+        //         <input type="button" value="添加到选项列表" onclick="addButtonClick()">
+        //     </div>
+        function parseHtmlTemplateMock() {
+            return {
+                dropdownList: {
+                    id: 'dropdownList',
+                    originHtml: '<select id="dropdownList"></select>',
+                    element: 'select',
+                    attributes: {},
+                    events: null,
+                    childs: {
+                        auto_1: {
+                            id: 'auto_1',
+                            originHtml: '<option value="{{item.value}}" v-for="item in options">{{item.label}}</option>',
+                            element: 'option',
+                            attributes: {
+                                value: '{{options[index].value}}',
+                            },
+                            innerText: '{{options[index].label}}',
+                            events: null,
+                            childs: null,
+                            commands: {
+                                vFor: data.options
+                            }
+                        }
+                    },
+                },
+                auto_3: {
+                    id: 'auto_3',
+                    originHtml: '<span>项目数量：</span>',
+                    element: 'span',
+                    attributes: {},
+                    innerText: '项目数量：',
+                    events: null,
+                    childs: null
+                },
+                itemCount: {
+                    id: 'itemCount',
+                    originHtml: '<input id="itemCount" name="itemCount" type="text" size="2" disabled value="{{options.length}}"/>',
+                    element: 'input',
+                    attributes: {
+                        type: 'text',
+                        size: '2',
+                        disabled: 'true',
+                        value: '{{options.length}}'
+                    },
+                    events: null,
+                    childs: null
+                },
+                auto_4: {
+                    id: 'auto_4',
+                    originHtml: '<span>按钮点击次数</span>',
+                    element: 'span',
+                    attributes: {},
+                    innerText: '按钮点击次数',
+                    events: null,
+                    childs: null
+                },
+                buttonClickCount: {
+                    id: 'buttonClickCount',
+                    originHtml: '<input id="buttonClickCount" name="buttonClickCount" type="text" size="2" disabled value="{{buttonClkCount}}"/>',
+                    element: 'input',
+                    attributes: {
+                        type: 'text',
+                        size: '2',
+                        disabled: 'true',
+                        value: '{{buttonClkCount}}'
+                    },
+                    events: null,
+                    childs: null
+                },
+                auto_5: {
+                    id: 'auto_5',
+                    originHtml: '<div></div>',
+                    element: 'div',
+                    attributes: {},
+                    events: null,
+                    childs: {
+                        auto_6: {
+                            id: 'auto_6',
+                            originHtml: '<input type="button" value="加载后台数据" @click="loadButtonClick">',
+                            element: 'input',
+                            attributes: {
+                                type: 'button',
+                                value: '加载后台数据'
+                            },
+                            events: {
+                                click: scripts.loadButtonClick
+                            },
+                            childs: null
+                        },
+                        optionText: {
+                            id: 'optionText',
+                            originHtml: ` <input id="optionText" name="optionText" type="text" value="{{textBoxData}}" />`,
+                            element: 'input',
+                            attributes: {
+                                type: 'text',
+                                name: 'optionText',
+                                value: '{{textBoxData}}'
+                            },
+                            events: null,
+                            childs: null,
+                            model: data.textBoxData
+                        },
+                        auto_7: {
+                            id: 'auto_7',
+                            originHtml: '<input type="button" value="添加到选项列表" @click="addButtonClick">',
+                            element: 'input',
+                            attributes: {
+                                type: 'button',
+                                value: '添加到选项列表'
+                            },
+                            events: {
+                                click: scripts.addButtonClick
+                            },
+                            childs: null
+                        },
+                    }
+                }
+            }
+        }
+
+    </script>
+</body>
+
+</html>
